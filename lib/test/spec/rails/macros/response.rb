@@ -8,7 +8,7 @@ module Test::Spec::Rails
         )
       end
     end
-    
+
     module Response
       class TestGenerator < Proxy
         attr_accessor :status, :message, :expected
@@ -27,7 +27,7 @@ module Test::Spec::Rails
 
             status = self.status
             message = self.message
-            
+
             if defined?(:ActiveRecord)
               test_case.it description do
                 begin
@@ -45,6 +45,36 @@ module Test::Spec::Rails
             end
           else
             super
+          end
+        end
+
+        def method_missing(xhr, verb, action, params={})
+          if xhr == :xhr
+            if [:get, :post, :put, :delete, :options].include?(verb.to_sym)
+              description = "should not find resource with #{verb.to_s.upcase} on `#{action}'"
+              description << " #{params.inspect}" unless params.blank?
+
+              status = self.status
+              message = self.message
+
+              if defined?(:ActiveRecord)
+                test_case.it description do
+                  begin
+                    send(:xhr, verb, action, immediate_values(params))
+                    status.should.messaging(message) == status
+                  rescue ActiveRecord::RecordNotFound
+                    :not_found.should.messaging(message) == status
+                  end
+                end
+              else
+                test_case.it description do
+                  send(:xhr, verb, action, immediate_values(params))
+                  status.should.messaging(message) == status
+                end
+              end
+            else
+              super
+            end
           end
         end
       end
